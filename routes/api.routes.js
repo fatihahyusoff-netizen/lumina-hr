@@ -51,7 +51,7 @@ const bcrypt = require('bcryptjs');
 const { generateUniqueEmail, generatePassword } = require('../utils/credentials');
 
 router.post('/employees', requireRole('hr'), async (req, res) => {
-  const { name, role, dept, type, salary } = req.body || {};
+  const { name, role, dept, type, salary, branch } = req.body || {};
   if (!name) return res.status(400).json({ error: 'Employee name is required.' });
   const annualSalary = Math.max(0, parseInt(salary, 10) || 60000);
   const countRow = await db.prepare('SELECT COUNT(*) c FROM employees').get();
@@ -60,9 +60,9 @@ router.post('/employees', requireRole('hr'), async (req, res) => {
   const email = await generateUniqueEmail(db, name);
   const joined = new Date().toISOString().slice(0, 10);
 
-  await db.prepare(`INSERT INTO employees (id,name,email,role,dept,type,status,joined,manager,salary,tax_id,leave_balance,avatar)
-              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-    .run(id, name, email, role || 'Team Member', dept || 'General', type || 'Full-time', 'Active', joined, '—', annualSalary, 'TX-PENDING', 12, avatar);
+  await db.prepare(`INSERT INTO employees (id,name,email,role,dept,type,status,joined,manager,salary,tax_id,leave_balance,avatar,branch)
+              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .run(id, name, email, role || 'Team Member', dept || 'General', type || 'Full-time', 'Active', joined, '—', annualSalary, 'TX-PENDING', 12, avatar, branch || null);
 
   await db.prepare('INSERT INTO payroll (emp_id, base, tax, benefits, status) VALUES (?,?,?,?,?)')
     .run(id, annualSalary / 12, 0.2, 0, 'Processing');
@@ -103,7 +103,7 @@ router.put('/employees/:id/generate-login', requireRole('hr'), async (req, res) 
 });
 
 router.put('/employees/:id', requireRole('hr'), async (req, res) => {
-  const fields = ['name', 'email', 'role', 'dept', 'type', 'status', 'manager', 'salary'];
+  const fields = ['name', 'email', 'role', 'dept', 'type', 'status', 'manager', 'salary', 'branch'];
   const updates = [];
   const values = [];
   fields.forEach(f => {
