@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 
-require('./db'); // initializes + seeds DB on first run
+const db = require('./db');
 
 const authRoutes = require('./routes/auth.routes');
 const apiRoutes = require('./routes/api.routes');
@@ -33,6 +33,14 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
-  console.log(`LUMINA HR backend running on http://localhost:${PORT}`);
-});
+
+db.init()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`LUMINA HR backend running on http://localhost:${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error('Failed to initialize the database. Check TURSO_DATABASE_URL / TURSO_AUTH_TOKEN.', err);
+    process.exit(1);
+  });

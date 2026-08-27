@@ -4,14 +4,14 @@ function slugify(name) {
   return name.toLowerCase().trim().replace(/[^a-z\s]/g, '').split(/\s+/).filter(Boolean).join('.');
 }
 
-function generateUniqueEmail(db, name) {
+async function generateUniqueEmail(db, name) {
   const base = slugify(name) || 'employee';
   let candidate = `${base}@lumina.com`;
   let n = 1;
-  const exists = (email) =>
-    db.prepare('SELECT 1 FROM employees WHERE email = ?').get(email) ||
-    db.prepare('SELECT 1 FROM users WHERE email = ?').get(email);
-  while (exists(candidate)) {
+  const exists = async (email) =>
+    (await db.prepare('SELECT 1 FROM employees WHERE email = ?').get(email)) ||
+    (await db.prepare('SELECT 1 FROM users WHERE email = ?').get(email));
+  while (await exists(candidate)) {
     n += 1;
     candidate = `${base}${n}@lumina.com`;
   }

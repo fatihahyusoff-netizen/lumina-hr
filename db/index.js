@@ -1,15 +1,17 @@
-const Database = require('better-sqlite3');
+const { createClient } = require('@libsql/client');
 const path = require('path');
-const fs = require('fs');
-const bcrypt = require('bcryptjs');
 
-const DB_PATH = path.join(__dirname, 'lumina.db');
-const isNew = !fs.existsSync(DB_PATH);
-const db = new Database(DB_PATH);
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+// TURSO_DATABASE_URL / TURSO_AUTH_TOKEN come from your Turso database (serverless,
+// persists across deploys and restarts). If they're not set, we fall back to a local
+// SQLite file so `npm start` still works with zero setup on your own machine.
+const usingTurso = !!process.env.TURSO_DATABASE_URL;
 
-db.exec(`
+const client = createClient({
+  url: process.env.TURSO_DATABASE_URL || `file:${path.join(__dirname, 'lumina.db')}`,
+  authToken: process.env.TURSO_AUTH_TOKEN,
+});
+
+const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   email TEXT UNIQUE NOT NULL,
@@ -97,9 +99,61 @@ CREATE TABLE IF NOT EXISTS onboarding (
   tasks TEXT NOT NULL,
   UNIQUE(emp_ref, kind)
 );
-`);
+`;
 
 // No demo data is seeded. The first person to open the app creates the
 // HR administrator account through the setup screen (see routes/auth.routes.js).
 
-module.exports = db;
+// ---- Compatibility shim -----------------------------------------------
+// The rest of the codebase was written against better-sqlite3's synchronous
+// `db.prepare(sql).get(...)/.all(...)/.run(...)` style. Turso's client is
+// network-based and therefore async, so this shim keeps the exact same call
+// shape at every call site — the only change needed elsewhere is adding
+// `await` in front of each call (and `async` on the route handlers).
+
+function rowToObject(row) {
+  // libSQL rows already support named property access; spreading strips
+  // internal symbols/metadata down to a plain object.
+  const obj = {};
+  for (const key of Object.keys(row)) obj[key] = row[key];
+  return obj;
+}
+
+function normalizeArgs(args) {
+  // better-sqlite3 accepted bound params as separate arguments; libSQL wants
+  // an array. Also convert `undefined` to `null` (libSQL rejects undefined).
+  return args.map((a) => (a === undefined ? null : a));
+}
+
+function prepare(sql) {
+  return {
+    async get(...args) {
+      const res = await client.execute({ sql, args: normalizeArgs(args) });
+      return res.rows[0] ? rowToObject(res.rows[0]) : undefined;
+    },
+    async all(...args) {
+      const res = await client.execute({ sql, args: normalizeArgs(args) });
+      return res.rows.map(rowToObject);
+    },
+    async run(...args) {
+      const res = await client.execute({ sql, args: normalizeArgs(args) });
+      return {
+        changes: Number(res.rowsAffected ?? 0),
+        lastInsertRowid:
+          res.lastInsertRowid !== undefined && res.lastInsertRowid !== null
+            ? Number(res.lastInsertRowid)
+            : undefined,
+      };
+    },
+  };
+}
+
+let ready = false;
+async function init() {
+  if (ready) return;
+  await client.executeMultiple(SCHEMA);
+  ready = true;
+  console.log(`Database ready (${usingTurso ? 'Turso — persistent' : 'local SQLite file'}).`);
+}
+
+module.exports = { prepare, init, usingTurso };
