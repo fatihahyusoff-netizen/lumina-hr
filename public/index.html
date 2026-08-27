@@ -733,11 +733,13 @@ async function decideLeave(id, decision){
 }
 
 /* ===================== HR: EMPLOYEE DIRECTORY ===================== */
-let dirSearch=''; let dirDept='All';
+let dirSearch=''; let dirDept='All'; let dirBranch='All';
 function viewDirectory(){
   const depts = ['All', ...new Set(state.employees.map(e=>e.dept))];
+      const branches = ['All', ...new Set(state.employees.map(e=>e.branch).filter(Boolean))];
   const rows = state.employees.filter(e=>
     (dirDept==='All'||e.dept===dirDept) &&
+        (dirBranch==='All'||e.branch===dirBranch) &&
     (e.name.toLowerCase().includes(dirSearch.toLowerCase()) || e.role.toLowerCase().includes(dirSearch.toLowerCase()))
   );
   return `
@@ -747,18 +749,22 @@ function viewDirectory(){
     <select class="filter-select" onchange="dirDept=this.value; renderMain();">
       ${depts.map(d=>`<option ${dirDept===d?'selected':''}>${d}</option>`).join('')}
     </select>
+        <select class="filter-select" onchange="dirBranch=this.value; renderMain();">
+              ${branches.map(b=>`<option ${dirBranch===b?'selected':''}>${b}</option>`).join('')}
+                  </select>
     <button class="btn primary" style="margin-left:auto;" onclick="openAddEmployeeModal()">+ Add employee</button>
   </div>
   <div class="card" style="padding:0;">
-    <table><thead><tr><th>Employee</th><th>Department</th><th>Contract</th><th>Manager</th><th>Joined</th><th>Status</th><th>Login</th><th></th></tr></thead>
+    <table><thead><tr><th>Employee</th><th>Branch</th><th>Department</th><th>Contract</th><th>Manager</th><th>Joined</th><th>Status</th><th>Login</th><th></th></tr></thead>
     <tbody>
     ${rows.map(e=>`<tr>
       <td><div class="flex-row"><div class="avatar-sm">${e.avatar}</div><div><div style="font-weight:600;">${e.name}</div><div class="muted" style="font-size:11.5px;">${e.role}</div></div></div></td>
+      <td>${e.branch || '—'}</td>
       <td>${e.dept}</td><td>${pill(e.type, e.type==='Full-time'?'blue':e.type==='Contract'?'purple':'gray')}</td>
       <td>${e.manager}</td><td class="mono">${e.joined}</td><td>${statusPill(e.status)}</td>
       <td>${e.has_login ? pill('Active','green') : pill('None','amber')}</td>
       <td><button class="btn xs" onclick="openEmployeeProfile('${e.id}')">View</button></td>
-    </tr>`).join('') || `<tr><td colspan="8"><div class="empty-state"><div class="glyph">◌</div>No employees match your filters.</div></td></tr>`}
+    </tr>`).join('') || `<tr><td colspan="9"><div class="empty-state"><div class="glyph">◌</div>No employees match your filters.</div></td></tr>`}
     </tbody></table>
   </div>
   <div id="modal-root"></div>
@@ -830,6 +836,7 @@ function openAddEmployeeModal(){
       <h3>Add employee</h3>
       <div class="field"><label>Full name</label><input id="new-emp-name" placeholder="e.g. Jordan Blake"></div>
       <div class="field"><label>Job title</label><input id="new-emp-role" placeholder="e.g. Marketing Analyst"></div>
+            <div class="field"><label>Branch</label><input id="new-emp-branch" placeholder="e.g. Kuala Lumpur HQ"></div>
       <div class="field"><label>Department</label><input id="new-emp-dept" placeholder="e.g. Marketing"></div>
       <div class="field"><label>Contract type</label>
         <select id="new-emp-type"><option>Full-time</option><option>Part-time</option><option>Contract</option></select>
@@ -842,11 +849,12 @@ function openAddEmployeeModal(){
 async function addEmployee(){
   const name = document.getElementById('new-emp-name').value.trim() || 'New Employee';
   const role = document.getElementById('new-emp-role').value.trim() || 'Team Member';
+      const branch = document.getElementById('new-emp-branch').value.trim() || null;
   const dept = document.getElementById('new-emp-dept').value.trim() || 'General';
   const type = document.getElementById('new-emp-type').value;
   const salary = document.getElementById('new-emp-salary').value;
   try {
-    const result = await api('/employees', { method: 'POST', body: JSON.stringify({ name, role, dept, type, salary }) });
+    const result = await api('/employees', { method: 'POST', body: JSON.stringify({ name, role, branch, dept, type, salary }) });
     await refreshData();
     renderMain();
     showCredentialsModal(result.employee.name, result.credentials);
