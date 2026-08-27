@@ -152,6 +152,16 @@ let ready = false;
 async function init() {
   if (ready) return;
   await client.executeMultiple(SCHEMA);
+
+    // Migration: add `branch` to employees if this database was created before
+    // branches existed. CREATE TABLE IF NOT EXISTS above won't add a column to
+    // an existing table, so we check and patch it here.
+    const cols = await client.execute('PRAGMA table_info(employees)');
+    const hasBranch = cols.rows.some((r) => r.name === 'branch');
+    if (!hasBranch) {
+          await client.execute('ALTER TABLE employees ADD COLUMN branch TEXT');
+          console.log('Migrated: added branch column to employees.');
+    }
   ready = true;
   console.log(`Database ready (${usingTurso ? 'Turso — persistent' : 'local SQLite file'}).`);
 }
