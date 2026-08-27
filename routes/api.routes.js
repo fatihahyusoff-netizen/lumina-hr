@@ -103,7 +103,7 @@ router.put('/employees/:id/generate-login', requireRole('hr'), async (req, res) 
 });
 
 router.put('/employees/:id', requireRole('hr'), async (req, res) => {
-  const fields = ['name', 'email', 'role', 'dept', 'type', 'status', 'manager', 'salary', 'branch, 'joined', 'tax_id', 'leave_balance'];
+  const fields = ['name', 'email', 'role', 'dept', 'type', 'status', 'manager', 'salary', 'branch', 'joined', 'tax_id', 'leave_balance'];
   const updates = [];
   const values = [];
   fields.forEach(f => {
