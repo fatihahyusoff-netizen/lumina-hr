@@ -886,17 +886,31 @@ function copyCredentials(email, password){
 function closeModal(){ const r = document.getElementById('modal-root'); if(r) r.innerHTML=''; }
 
 /* ===================== HR: ONBOARDING / OFFBOARDING ===================== */
+let onbSearch=''; let onbPage=1;
 function viewOnboarding(){
+  const filtered = state.onboarding.filter(o => o.name.toLowerCase().includes(onbSearch.toLowerCase()));
+  const perPage = 10;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+  if (onbPage > totalPages) onbPage = totalPages;
+  if (onbPage < 1) onbPage = 1;
+  const pageItems = filtered.slice((onbPage - 1) * perPage, onbPage * perPage);
   return `
   ${topbar('Onboarding & Offboarding', 'Digital checklists, e-signatures, and asset tracking for arrivals and departures.')}
   <div class="grid cols-2">
     <div class="card">
       <div class="section-title">Onboarding <small>New hires in progress</small></div>
-      ${state.onboarding.map(o=>renderChecklist(o,'onboarding')).join('')}
+      <input class="search-input" style="width:100%; margin-bottom:14px;" placeholder="Search by name…" value="${onbSearch}" oninput="onbSearch=this.value; onbPage=1; renderMain();">
+      ${pageItems.map(o=>renderChecklist(o,'onboarding')).join('') || `<div class="empty-state"><div class="glyph">◌</div>No matching employees.</div>`}
+      ${filtered.length > perPage ? `
+      <div class="flex-row" style="justify-content:space-between; margin-top:4px;">
+        <button class="btn xs" ${onbPage<=1?'disabled':''} onclick="onbPage=Math.max(1,onbPage-1); renderMain();">← Prev</button>
+        <span class="muted" style="font-size:12px;">Page ${onbPage} of ${totalPages} · ${filtered.length} match${filtered.length===1?'':'es'}</span>
+        <button class="btn xs" ${onbPage>=totalPages?'disabled':''} onclick="onbPage=Math.min(${totalPages},onbPage+1); renderMain();">Next →</button>
+      </div>` : ''}
     </div>
     <div class="card">
       <div class="section-title">Offboarding <small>Departures in progress</small></div>
-      ${state.offboarding.map(o=>renderChecklist(o,'offboarding')).join('')}
+      ${state.offboarding.map(o=>renderChecklist(o,'offboarding')).join('') || `<div class="empty-state"><div class="glyph">◌</div>No active offboarding.</div>`}
     </div>
   </div>`;
 }
