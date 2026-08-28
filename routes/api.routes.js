@@ -195,6 +195,18 @@ router.put('/candidates/:id/advance', requireRole('hr'), async (req, res) => {
   res.json({ ok: true, stage: c.stage });
 });
 
+/* ---------------- USER ROLES ---------------- */
+// Lets an existing HR user grant or revoke HR-level access for another account.
+router.put('/users/:email/role', requireRole('hr'), async (req, res) => {
+  const { role } = req.body || {};
+  if (!['hr', 'employee'].includes(role)) return res.status(400).json({ error: "Role must be 'hr' or 'employee'." });
+  const cleanEmail = String(req.params.email).toLowerCase().trim();
+  const user = await db.prepare('SELECT * FROM users WHERE email = ?').get(cleanEmail);
+  if (!user) return res.status(404).json({ error: 'No account found with that email.' });
+  await db.prepare('UPDATE users SET role = ? WHERE email = ?').run(role, cleanEmail);
+  res.json({ ok: true, email: cleanEmail, role });
+});
+
 /* ---------------- OFFBOARDING ---------------- */
 router.post('/employees/:id/offboard', requireRole('hr'), async (req, res) => {
   const employee = await db.prepare('SELECT * FROM employees WHERE id = ?').get(req.params.id);
