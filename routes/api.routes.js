@@ -234,6 +234,17 @@ router.put('/users/:email/role', requireRole('hr'), async (req, res) => {
   res.json({ ok: true, email: cleanEmail, role });
 });
 
+// Lets HR reset any account's password directly (no need to know the old one).
+router.put('/users/:email/reset-password', requireRole('hr'), async (req, res) => {
+  const cleanEmail = String(req.params.email).toLowerCase().trim();
+  const user = await db.prepare('SELECT * FROM users WHERE email = ?').get(cleanEmail);
+  if (!user) return res.status(404).json({ error: 'No account found with that email.' });
+  const newPassword = (req.body && req.body.newPassword) || generatePassword();
+  const passwordHash = bcrypt.hashSync(newPassword, 10);
+  await db.prepare('UPDATE users SET password_hash = ? WHERE email = ?').run(passwordHash, cleanEmail);
+  res.json({ ok: true, email: cleanEmail, password: newPassword });
+});
+
 /* ---------------- OFFBOARDING ---------------- */
 router.post('/employees/:id/offboard', requireRole('hr'), async (req, res) => {
   const employee = await db.prepare('SELECT * FROM employees WHERE id = ?').get(req.params.id);
