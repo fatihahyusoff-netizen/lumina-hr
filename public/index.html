@@ -966,14 +966,24 @@ async function markPaid(empId){
 }
 
 /* ===================== HR: ATTENDANCE ===================== */
+let attDate = '';
 function viewAttendance(){
+  const dates = [...new Set(state.attendance.map(a => a.date))].sort().reverse();
+  if (!attDate || !dates.includes(attDate)) attDate = dates[0] || new Date().toISOString().slice(0,10);
+  const dayRows = state.attendance.filter(a => a.date === attDate);
+  const isToday = attDate === new Date().toISOString().slice(0,10);
   return `
   ${topbar('Time & Attendance', 'Clock-ins, shifts, and leave requests across the organization.')}
   <div class="grid cols-2">
     <div class="card">
-      <div class="section-title">Today's Log</div>
+      <div class="section-title" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <span>${isToday ? "Today's Log" : 'Log for ' + attDate}</span>
+        <select class="search-input" style="width:auto; padding:4px 8px;" onchange="attDate=this.value; renderMain();">
+          ${dates.length ? dates.map(d => `<option value="${d}" ${d===attDate?'selected':''}>${d}${d===new Date().toISOString().slice(0,10)?' (Today)':''}</option>`).join('') : `<option value="${attDate}">${attDate}</option>`}
+        </select>
+      </div>
       <table><thead><tr><th>Employee</th><th>In</th><th>Out</th><th>Hours</th><th>Status</th></tr></thead>
-      <tbody>${state.attendance.map(a=>`<tr><td>${a.name}</td><td class="mono">${a.clockIn}</td><td class="mono">${a.clockOut}</td><td>${a.hours||'—'}</td><td>${statusPill(a.status)}</td></tr>`).join('')}</tbody></table>
+      <tbody>${dayRows.length ? dayRows.map(a=>`<tr><td>${a.name}</td><td class="mono">${a.clockIn}</td><td class="mono">${a.clockOut}</td><td>${a.hours||'—'}</td><td>${statusPill(a.status)}</td></tr>`).join('') : `<tr><td colspan="5" class="muted">No attendance records for this date.</td></tr>`}</tbody></table>
     </div>
     <div class="card">
       <div class="section-title">Leave Requests</div>
