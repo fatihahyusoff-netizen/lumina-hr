@@ -158,6 +158,33 @@ router.post('/attendance/clock', async (req, res) => {
   res.json({ ok: true, time });
 });
 
+// HR-only: log or update an attendance record for ANY employee, for a given date.
+// Used for backfilling/simulating attendance rather than self clock-in.
+router.post('/attendance/log', requireRole('hr'), async (req, res) => {
+  const { empId, date, clockIn, clockOut, status } = req.body || {};
+  if (!empId || !date) return res.status(400).json({ error: 'empId and date are required.' });
+  const employee = await db.prepare('SELECT * FROM employees WHERE id = ?').get(empId);
+  if (!employee) return res.status(404).json({ error: 'Employee not found.' });
+
+  let hours = 0;
+  if (clockIn && clockOut) {
+    const [inH, inM] = clockIn.split(':').map(Number);
+    const [outH, outM] = clockOut.split(':').map(Number);
+    hours = Math.max(0, ((outH * 60 + outM) - (inH * 60 + inM)) / 60);
+  }
+  const finalStatus = status || 'On time';
+
+  const row = await db.prepare('SELECT * FROM attendance WHERE emp_id = ? AND date = ?').get(empId, date);
+  if (!row) {
+    await db.prepare('INSERT INTO attendance (emp_id, date, clock_in, clock_out, hours, status) VALUES (?,?,?,?,?,?)')
+      .run(empId, date, clockIn || null, clockOut || null, hours, finalStatus);
+  } else {
+    await db.prepare('UPDATE attendance SET clock_in = ?, clock_out = ?, hours = ?, status = ? WHERE id = ?')
+      .run(clockIn || row.clock_in, clockOut || row.clock_out, hours || row.hours, finalStatus, row.id);
+  }
+  res.json({ ok: true, empId, date, clockIn, clockOut, hours, status: finalStatus });
+});
+
 /* ---------------- ATS ---------------- */
 const STAGES = ['Applied', 'Screening', 'Interview', 'Offer', 'Hired'];
 
